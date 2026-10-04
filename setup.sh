@@ -596,7 +596,14 @@ if [[ ! -f "$HF_TOKEN_FILE" ]]; then
   chmod 600 "$HF_TOKEN_FILE"
 fi
 if ! grep -q 'HF_TOKEN=' "$HF_TOKEN_FILE" 2>/dev/null; then
-  echo 'HF_TOKEN=hf_YOUR_TOKEN_HERE' >> "$HF_TOKEN_FILE"
+  cat >> "$HF_TOKEN_FILE" <<'EOF'
+# Hugging Face token — needed for:
+#   • Downloading gated models (e.g. Qwen3-Coder-Next) via huggingface_hub
+#   • Accessing models that require explicit permission
+# Get one at https://huggingface.co/settings/tokens (free, any scope works)
+# Then paste it below: HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
+HF_TOKEN=hf_YOUR_TOKEN_HERE
+EOF
 fi
 
 log "Shell profile updated (.profile + .zshrc)."

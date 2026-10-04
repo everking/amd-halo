@@ -286,7 +286,14 @@ if [[ -f ~/.env ]]; then source ~/.env; fi
 #### Create `~/.env`
 
 ```bash
-echo 'HF_TOKEN=hf_your_token_here' > ~/.env
+cat > ~/.env <<'EOF'
+# Hugging Face token — needed for:
+#   • Downloading gated models (e.g. Qwen3-Coder-Next) via huggingface_hub
+#   • Accessing models that require explicit permission
+# Get one at https://huggingface.co/settings/tokens (free, any scope works)
+# Then paste it below: HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
+HF_TOKEN=hf_your_token_here
+EOF
 chmod 600 ~/.env
 ```
 
