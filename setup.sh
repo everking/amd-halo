@@ -601,120 +601,56 @@ fi
 
 log "Shell profile updated (.profile + .zshrc)."
 
-# ── 10. Pi configuration ───────────────────────────────────────────────────
+# ── 10. Copy config from repo ──────────────────────────────────────────────
 
-log "=== Pi configuration ==="
+log "=== Copying config from repo ==="
 
-# Create the user-level config directory
-mkdir -p ~/.pi/agent
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# settings.json
-if [[ ! -f ~/.pi/agent/settings.json ]]; then
-  cat > ~/.pi/agent/settings.json <<'EOF'
-{
-  "lastChangelogVersion": "1.0.2",
-  "defaultProvider": "huggingface",
-  "defaultModel": "openai/gpt-oss-120b"
-}
-EOF
-fi
+# Pi agent config
+PI_TARGET="$HOME/.pi/agent"
+mkdir -p "$PI_TARGET"
+for f in "$REPO_DIR/config/pi/"*; do
+  [[ -f "$f" ]] || continue
+  fname="$(basename "$f")"
+  TARGET="$PI_TARGET/$fname"
+  if [[ ! -f "$TARGET" ]]; then
+    cp "$f" "$TARGET"
+    log "Installed $TARGET"
+  else
+    log "$TARGET already exists, skipping."
+  fi
+done
 
-# models.json (LM Studio provider)
-if [[ ! -f ~/.pi/agent/models.json ]]; then
-  cat > ~/.pi/agent/models.json <<'EOF'
-{
-  "providers": {
-    "lmstudio": {
-      "name": "LM Studio",
-      "baseUrl": "http://127.0.0.1:1234/v1",
-      "api": "openai-completions",
-      "apiKey": "lm-studio",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false,
-        "supportsLongCacheRetention": false,
-        "sendSessionAffinityHeaders": false,
-        "maxTokensField": "max_tokens"
-      },
-      "models": [
-        {
-          "id": "qwen/qwen3-coder-next",
-          "name": "Qwen3 Coder Next",
-          "reasoning": false,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "google/gemma-4-31b",
-          "name": "Gemma 4 31B",
-          "reasoning": false,
-          "input": ["text", "image"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "lemonade/qwen3-coder-30b-a3b-instruct",
-          "name": "Qwen3 Coder 30B A3B",
-          "reasoning": false,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "unsloth/qwen3-coder-30b-a3b-instruct",
-          "name": "Qwen3 Coder 30B A3B (Unsloth)",
-          "reasoning": false,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "gpt-oss-20b",
-          "name": "GPT-OSS 20B",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "gpt-oss-120b",
-          "name": "GPT-OSS 120B",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "q4_k_m",
-          "name": "GPT-OSS 120B (q4_k_m)",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "qwen/qwen3.6-35b-a3b",
-          "name": "Qwen3.6 35B A3B",
-          "reasoning": true,
-          "input": ["text", "image"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        }
-      ]
-    }
-  }
-}
-EOF
-fi
+# LM Studio config
+LMSTUDIO_TARGET="$HOME/.lmstudio"
+mkdir -p "$LMSTUDIO_TARGET"
+for f in "$REPO_DIR/config/lm-studio/"*; do
+  [[ -f "$f" ]] || continue
+  fname="$(basename "$f")"
+  TARGET="$LMSTUDIO_TARGET/$fname"
+  if [[ ! -f "$TARGET" ]]; then
+    cp "$f" "$TARGET"
+    log "Installed $TARGET"
+  else
+    log "$TARGET already exists, skipping."
+  fi
+done
+
+# LM Studio internal config
+LMSTUDIO_INTERNAL="$HOME/.lmstudio/.internal"
+mkdir -p "$LMSTUDIO_INTERNAL"
+for f in "$REPO_DIR/config/lm-studio/"*; do
+  [[ -f "$f" ]] || continue
+  fname="$(basename "$f")"
+  TARGET="$LMSTUDIO_INTERNAL/$fname"
+  if [[ ! -f "$TARGET" ]]; then
+    cp "$f" "$TARGET"
+    log "Installed $TARGET"
+  else
+    log "$TARGET already exists, skipping."
+  fi
+done
 
 # ── 11. Cloudflare tunnel service ──────────────────────────────────────────
 
