@@ -885,20 +885,68 @@ log "Custom scripts installed to ~/bin/"
 
 log "=== Shell profile ==="
 
-# Add to ~/.profile if not already present
+# Install zsh
+if ! command -v zsh &>/dev/null; then
+  log "Installing zsh..."
+  sudo_if_needed apt-get install -y zsh
+fi
+
+# Install oh-my-zsh (non-interactive)
+if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+  log "Installing oh-my-zsh..."
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+fi
+
+# ── .profile (sourced by login shells: bash, zsh, etc.) ─────────────────
+
 PROFILE="$HOME/.profile"
 if [[ ! -f "$PROFILE" ]]; then
   touch "$PROFILE"
 fi
 
-# Add LM Studio bin to PATH
+# Add ~/.local/bin to PATH (if not already present)
+if ! grep -q '.local/bin' "$PROFILE" 2>/dev/null; then
+  echo '' >> "$PROFILE"
+  echo '# Local bin directory' >> "$PROFILE"
+  echo 'if [ -d "$HOME/.local/bin" ]; then PATH="$HOME/.local/bin:$PATH"; fi' >> "$PROFILE"
+fi
+
+# Add ~/bin to PATH (if not already present)
+if ! grep -q 'HOME/bin' "$PROFILE" 2>/dev/null; then
+  echo '' >> "$PROFILE"
+  echo '# Custom scripts' >> "$PROFILE"
+  echo 'if [ -d "$HOME/bin" ]; then PATH="$HOME/bin:$PATH"; fi' >> "$PROFILE"
+fi
+
+# Add LM Studio bin to PATH (if not already present)
 if ! grep -q 'lmstudio/bin' "$PROFILE" 2>/dev/null; then
   echo '' >> "$PROFILE"
   echo '# LM Studio CLI' >> "$PROFILE"
   echo 'export PATH="$PATH:/home/eric/.lmstudio/bin"' >> "$PROFILE"
 fi
 
-# Add HF_TOKEN (store in ~/.env or use a secrets file)
+# Source HF_TOKEN from ~/.env (if not already present)
+if ! grep -q 'HF_TOKEN' "$PROFILE" 2>/dev/null; then
+  echo '' >> "$PROFILE"
+  echo '# Hugging Face token' >> "$PROFILE"
+  echo 'if [[ -f ~/.env ]]; then source ~/.env; fi' >> "$PROFILE"
+fi
+
+# ── .zshrc (sourced by interactive zsh shells) ──────────────────────────
+
+ZSHRC="$HOME/.zshrc"
+if [[ ! -f "$ZSHRC" ]]; then
+  touch "$ZSHRC"
+fi
+
+# Source .profile so zsh gets the same variables as bash
+if ! grep -q 'source ~/.profile' "$ZSHRC" 2>/dev/null; then
+  echo '' >> "$ZSHRC"
+  echo '# Source .profile for shared variables (PATH, HF_TOKEN, etc.)'
+  echo 'if [[ -f "$HOME/.profile" ]]; then source "$HOME/.profile"; fi' >> "$ZSHRC"
+fi
+
+# Create ~/.env if it doesn't exist
 HF_TOKEN_FILE="$HOME/.env"
 if [[ ! -f "$HF_TOKEN_FILE" ]]; then
   echo "# Hugging Face token" > "$HF_TOKEN_FILE"
@@ -908,21 +956,7 @@ if ! grep -q 'HF_TOKEN=' "$HF_TOKEN_FILE" 2>/dev/null; then
   echo 'HF_TOKEN=hf_YOUR_TOKEN_HERE' >> "$HF_TOKEN_FILE"
 fi
 
-# Source HF_TOKEN in .profile if not already present
-if ! grep -q 'HF_TOKEN' "$PROFILE" 2>/dev/null; then
-  echo '' >> "$PROFILE"
-  echo '# Hugging Face token' >> "$PROFILE"
-  echo 'if [[ -f ~/.env ]]; then source ~/.env; fi' >> "$PROFILE"
-fi
-
-# Add ~/bin to PATH
-if ! grep -q 'HOME/bin' "$PROFILE" 2>/dev/null; then
-  echo '' >> "$PROFILE"
-  echo '# Custom scripts' >> "$PROFILE"
-  echo 'if [ -d "$HOME/bin" ]; then PATH="$HOME/bin:$PATH"; fi' >> "$PROFILE"
-fi
-
-log "Shell profile updated."
+log "Shell profile updated (.profile + .zshrc)."
 
 # ── 10. Pi configuration ───────────────────────────────────────────────────
 

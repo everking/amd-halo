@@ -298,27 +298,39 @@ This sets up headless RDP on port 3389 with auto-generated credentials.
 
 ### 9. Shell profile
 
-Add to `~/.profile`:
+The setup installs **zsh** (with oh-my-zsh) and creates a combined profile:
+
+- **`~/.profile`** — sourced by login shells (bash, zsh). Contains all PATH and variable exports.
+- **`~/.zshrc`** — sources `~/.profile` so zsh gets the same variables.
+
+#### What gets added to `~/.profile`
 
 ```bash
+# Local bin directory
+if [ -d "$HOME/.local/bin" ]; then PATH="$HOME/.local/bin:$PATH"; fi
+
+# Custom scripts
+if [ -d "$HOME/bin" ]; then PATH="$HOME/bin:$PATH"; fi
+
 # LM Studio CLI
 export PATH="$PATH:/home/eric/.lmstudio/bin"
 
-# Custom scripts
-if [ -d "$HOME/bin" ]; then
-  PATH="$HOME/bin:$PATH"
-fi
-
 # Hugging Face token
-if [[ -f ~/.env ]]; then
-  source ~/.env
-fi
+if [[ -f ~/.env ]]; then source ~/.env; fi
 ```
 
-Create `~/.env`:
+#### Create `~/.env`
 
 ```bash
-HF_TOKEN=hf_your_token_here
+echo 'HF_TOKEN=hf_your_token_here' > ~/.env
+chmod 600 ~/.env
+```
+
+#### Switch to zsh (optional)
+
+```bash
+chsh -s $(which zsh)
+# Then log out and back in
 ```
 
 ### 10. Enable user linger (services survive logout)
