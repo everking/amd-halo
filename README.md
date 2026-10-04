@@ -14,6 +14,35 @@ Reproducible setup for the AMD Ryzen AI Developer Platform (rex).
 | WiFi | MEDIATEK MT7925 (RZ717) Wi-Fi 7 |
 | Audio | AMD/ATI Radeon High Definition Audio |
 
+## LM Studio Optimization
+
+See **[LM-Studio-Optimization.md](LM-Studio-Optimization.md)** for the full tuning guide applied on 2026-10-03.
+
+### Key changes (also applied by `setup.sh --optimize`)
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| GGUF engine | **Vulkan AVX2** | 8060S GPU offload (no ROCm in LM Studio) |
+| Context length | **65536** | Lower RAM pressure & latency |
+| GPU offload | **max** (999999 layers) | Full model on GPU |
+| Parallel slots | **2** | Reduce KV cache duplication |
+| Flash attention | **on** | Faster prefill |
+
+### Verification
+
+```bash
+~/.lmstudio/bin/lms server status
+~/.lmstudio/bin/lms runtime ls
+~/.lmstudio/bin/lms ps
+pgrep -af llama-server | grep vulkan-avx2
+```
+
+### Standard model load
+
+```bash
+~/.lmstudio/bin/lms load qwen/qwen3.6-35b-a3b --gpu max -c 65536 --parallel 2
+```
+
 ## Quick start
 
 ```bash

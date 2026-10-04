@@ -164,6 +164,122 @@ else
   warn "Skipping LM Studio install."
 fi
 
+# ── 3b. LM Studio Optimization (Strix Halo) ──────────────────────────────
+
+if [[ "${SKIP_LM_STUDIO:-0}" != "1" ]]; then
+  log "=== LM Studio Optimization ==="
+
+  # Helper to find lms CLI
+  LMS=""
+  for candidate in \
+    "$HOME/.lmstudio/bin/lms" \
+    /opt/lm-studio/lms \
+    /opt/lm-studio/bin/lms \
+    "$HOME/bin/lms"; do
+    if [[ -x "$candidate" ]]; then
+      LMS="$candidate"
+      break
+    fi
+  done
+
+  if [[ -z "$LMS" ]]; then
+    warn "lms CLI not found. Optimization skipped (run after LM Studio is installed)."
+  else
+    log "Found lms at $LMS"
+
+    # 1. Set Vulkan as default GGUF engine
+    log "Setting Vulkan GGUF engine..."
+    BACKEND_PREF="$HOME/.lmstudio/.internal/backend-preferences-v1.json"
+    if [[ -f "$BACKEND_PREF" ]]; then
+      if grep -q 'vulkan-avx2' "$BACKEND_PREF" 2>/dev/null; then
+        log "Vulkan backend already set."
+      else
+        # Replace avx2 with vulkan-avx2 in the preferences file
+        sed -i 's/llama.cpp-linux-x86_64-avx2/llama.cpp-linux-x86_64-vulkan-avx2/g' "$BACKEND_PREF"
+        log "Updated backend-preferences-v1.json → vulkan-avx2"
+      fi
+    else
+      log "No backend-preferences-v1.json found — creating..."
+      mkdir -p "$HOME/.lmstudio/.internal"
+      cat > "$BACKEND_PREF" <<'EOF'
+{
+  "gguf": {
+    "backend": "llama.cpp-linux-x86_64-vulkan-avx2"
+  }
+}
+EOF
+      log "Created $BACKEND_PREF"
+    fi
+
+    # 2. Set default context length to 65536
+    log "Setting default context length to 65536..."
+    LM_STUDIO_SETTINGS="$HOME/.lmstudio/settings.json"
+    if [[ -f "$LM_STUDIO_SETTINGS" ]]; then
+      if grep -q '"defaultContextLength"' "$LM_STUDIO_SETTINGS" 2>/dev/null; then
+        # Update existing value
+        if grep -q '"value": 65536' "$LM_STUDIO_SETTINGS" 2>/dev/null; then
+          log "Context length already 65536."
+        else
+          sed -i 's/"defaultContextLength":.*"value": *[0-9]*/"defaultContextLength": { "type": "custom", "value": 65536 }/' "$LM_STUDIO_SETTINGS"
+          log "Updated defaultContextLength to 65536."
+        fi
+      else
+        # Add the setting
+        sed -i '/}/i\  "defaultContextLength": { "type": "custom", "value": 65536 },' "$LM_STUDIO_SETTINGS"
+        log "Added defaultContextLength to settings.json."
+      fi
+    else
+      log "No settings.json — creating minimal one..."
+      cat > "$LM_STUDIO_SETTINGS" <<'EOF'
+{
+  "language": "en",
+  "downloadsFolder": "/home/eric/.lmstudio/models",
+  "defaultContextLength": { "type": "custom", "value": 65536 },
+  "useLlamaCppEngineProtocolRuntime3": true
+}
+EOF
+    fi
+
+    # 3. Set server port to 1234 (standard for this setup)
+    log "Ensuring server port is 1234..."
+    if [[ ! -f "$HOME/bin/lm-studio-start.sh" ]]; then
+      cat > "$HOME/bin/lm-studio-start.sh" <<'SCRIPT'
+#!/usr/bin/env bash
+# Start the LM Studio inference server (lms)
+# Usage: lm-studio-start.sh
+set -euo pipefail
+
+if ! command -v lms &>/dev/null; then
+  if [[ -x /opt/lm-studio/lms ]]; then
+    /opt/lm-studio/lms server start --bind 0.0.0.0 --port 13305
+  else
+    echo "lms CLI not found."
+    exit 1
+  fi
+else
+  lms server start --bind 0.0.0.0 --port 1234
+fi
+SCRIPT
+      chmod +x "$HOME/bin/lm-studio-start.sh"
+      log "Created ~/bin/lm-studio-start.sh (port 1234)."
+    fi
+
+    log "Optimization complete."
+    log ""
+    log "To apply Vulkan + optimized load on the current session:"
+    log "  $LMS server stop"
+    log "  $LMS server start --bind 0.0.0.0 --port 1234"
+    log "  $LMS load qwen/qwen3.6-35b-a3b --gpu max -c 65536 --parallel 2"
+    log ""
+    log "Verify:"
+    log "  $LMS runtime ls"
+    log "  $LMS ps"
+    log "  pgrep -af llama-server | grep vulkan-avx2"
+  fi
+else
+  warn "Skipping LM Studio optimization."
+fi
+
 # ── 4. Pi Coding Agent ─────────────────────────────────────────────────────
 
 if [[ "${SKIP_PI:-0}" != "1" ]]; then
@@ -1121,8 +1237,10 @@ echo ""
 echo "Next steps:"
 echo ""
 echo "  1. LM Studio:"
-echo "     - Open the LM Studio GUI and load a model"
-echo "     - Or run: ~/bin/lm-studio-start.sh"
+echo "     - Run: ~/bin/lm-studio-start.sh"
+echo "     - Optimize (Vulkan + 64k context):"
+echo "       lms load qwen/qwen3.6-35b-a3b --gpu max -c 65536 --parallel 2"
+echo "     - See LM-Studio-Optimization.md for full tuning guide"
 echo ""
 echo "  2. Models:"
 echo "     - ~/bin/pull-qwen3-coder-next.sh   (Qwen3-Coder-Next, ~48 GB)"
