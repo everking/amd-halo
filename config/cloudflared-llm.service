@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare Tunnel (LLM)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate run --token $(cat ~/.cloudflared/TUNNEL_ID)
+Restart=always
+RestartSec=5
+Environment=CF_TUNNEL_TOKEN=$(cat ~/.cloudflared/TUNNEL_ID)
+
+[Install]
+WantedBy=default.target

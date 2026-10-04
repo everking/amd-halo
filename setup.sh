@@ -659,24 +659,10 @@ log "=== Cloudflare tunnel service ==="
 TUNNEL_DIR="$HOME/.config/systemd/user"
 mkdir -p "$TUNNEL_DIR"
 
+SRC="$REPO_DIR/config/cloudflared-llm.service"
 if [[ ! -f "$TUNNEL_DIR/cloudflared-llm.service" ]]; then
-  cat > "$TUNNEL_DIR/cloudflared-llm.service" <<'EOF'
-[Unit]
-Description=Cloudflare Tunnel (LLM)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate run --token $(cat ~/.cloudflared/TUNNEL_ID)
-Restart=always
-RestartSec=5
-Environment=CF_TUNNEL_TOKEN=$(cat ~/.cloudflared/TUNNEL_ID)
-
-[Install]
-WantedBy=default.target
-EOF
-  log "Created cloudflared-llm.service"
+  cp "$SRC" "$TUNNEL_DIR/cloudflared-llm.service"
+  log "Installed cloudflared-llm.service"
 fi
 
 # ── 12. Final notes ────────────────────────────────────────────────────────
