@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local overrides (user-specific)
+.env
+
+# LM Studio downloads (model files are large)
+.lmstudio/models/
+
+# Cloudflare
+.cloudflared/

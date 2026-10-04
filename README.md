@@ -14,11 +14,38 @@ Reproducible setup for the AMD Ryzen AI Developer Platform (rex).
 | WiFi | MEDIATEK MT7925 (RZ717) Wi-Fi 7 |
 | Audio | AMD/ATI Radeon High Definition Audio |
 
+## Repo structure
+
+```
+amd-halo/
+├── setup.sh              # Idempotent setup script
+├── README.md
+├── LM-Studio-Optimization.md
+├── llm-origin-proxy.py
+├── config/
+│   ├── pi/
+│   │   ├── settings.json  # Pi agent config
+│   │   └── models.json    # LM Studio provider + models
+│   └── lm-studio/
+│       ├── settings.json  # LM Studio preferences (64k context)
+│       ├── mcp.json       # MCP server config
+│       └── backend-preferences-v1.json  # Vulkan GGUF engine
+└── bin/
+    ├── lm-studio-start.sh
+    ├── cloudflared-login.sh
+    ├── cloudflared-llm.sh
+    ├── pull-qwen3-coder-next.sh
+    └── install-remote-desktop.sh
+```
+
+**Static config files live in `config/`** — they are copied to their target locations during setup.
+**Scripts live in `bin/`** — they are copied to `~/bin/` during setup.
+
 ## LM Studio Optimization
 
 See **[LM-Studio-Optimization.md](LM-Studio-Optimization.md)** for the full tuning guide applied on 2026-10-03.
 
-### Key changes (also applied by `setup.sh --optimize`)
+### Key changes (also applied by `setup.sh`)
 
 | Setting | Value | Why |
 |---------|-------|-----|
