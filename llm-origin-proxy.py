@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Forward local HTTP to Lemonade.
+"""Forward local HTTP to LM Studio (OpenAI-compatible API on port 1234).
 
 Three request edits:
-- Drop Origin. Lemonade 11.8.1 rejects a non-loopback browser Origin with 403.
+- Drop Origin when present (avoids 403s from some local servers behind a tunnel).
 - On chat requests, append a system note that this model is running on amd-halo.
-- On chat requests, let the model call web_search and fetch_url. Lemonade has
-  no browser of its own; this proxy performs those calls and sends the text back.
+- On chat requests, let the model call web_search and fetch_url; this proxy
+  performs those calls and sends the text back.
 """
 
 import asyncio
@@ -23,14 +23,14 @@ from html.parser import HTMLParser
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = 13315
 TARGET_HOST = "127.0.0.1"
-TARGET_PORT = 13305
+TARGET_PORT = 1234
 MAX_HEADER = 1024 * 1024
 MAX_BODY = 32 * 1024 * 1024
 
 LOCAL_NOTE = (
     "You are the local model {model} running on the user's own computer, "
     "hostname amd-halo, an AMD Ryzen AI MAX+ 395 (Strix Halo) with a Radeon 8060S. "
-    "Lemonade serves you on that machine at http://127.0.0.1:13305. "
+    "LM Studio serves you on that machine at http://127.0.0.1:1234. "
     "https://llm.m634.dev is a Cloudflare Tunnel to that same local server. "
     "You are not Claude, not ChatGPT, and you are not running on Anthropic, "
     "OpenAI, or any other company's servers. If an earlier instruction says you "

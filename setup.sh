@@ -19,6 +19,12 @@
 #   SKIP_RDP=1           — skip remote desktop install
 #   SKIP_MODELS=1        — skip model downloads
 #   SKIP_GIT_CONFIG=1    — skip git config
+#   SKIP_SERVER_POWER=1  — skip disable idle suspend (remote server role)
+#
+# LM Studio at reboot (no login): setup runs bin/install-lm-studio-service.sh
+# (systemd user unit lm-studio.service + loginctl enable-linger).
+# Remote server (no idle suspend): setup runs bin/configure-server-power.sh
+# unless SKIP_SERVER_POWER=1. See README "Rebuild from scratch".
 #
 # ============================================================================
 set -euo pipefail
@@ -197,13 +203,7 @@ if [[ "${SKIP_LM_STUDIO:-0}" != "1" ]]; then
       log "mcp.json already exists, skipping."
     fi
 
-    # 4. Install lm-studio-start.sh from repo (port 1234)
-    if [[ ! -f "$HOME/bin/lm-studio-start.sh" ]]; then
-      mkdir -p "$HOME/bin"
-      cp "$REPO_DIR/bin/lm-studio-start.sh" "$HOME/bin/lm-studio-start.sh"
-      chmod +x "$HOME/bin/lm-studio-start.sh"
-      log "Installed ~/bin/lm-studio-start.sh (port 1234)."
-    fi
+    # Boot scripts + systemd unit: install-lm-studio-service.sh (setup section 11b)
 
     log "Optimization complete."
     log ""
@@ -672,6 +672,20 @@ if [[ ! -f "$TUNNEL_DIR/cloudflared-llm.service" ]]; then
   log "Installed cloudflared-llm.service"
 fi
 
+# ── 11b. LM Studio boot at login / boot (user systemd + linger) ───────────
+
+log "=== LM Studio systemd service ==="
+"$REPO_DIR/bin/install-lm-studio-service.sh"
+
+# ── 11c. Remote server: do not suspend on idle ───────────────────────────
+
+if [[ "${SKIP_SERVER_POWER:-0}" != "1" ]]; then
+  log "=== Server power (no idle suspend) ==="
+  "$REPO_DIR/bin/configure-server-power.sh"
+else
+  warn "Skipping server power configuration."
+fi
+
 # ── 12. Final notes ────────────────────────────────────────────────────────
 
 log "=== Setup complete ==="
@@ -679,7 +693,8 @@ echo ""
 echo "Next steps:"
 echo ""
 echo "  1. LM Studio:"
-echo "     - Run: ~/bin/lm-studio-start.sh"
+echo "     - Boot service: systemctl --user status lm-studio.service"
+echo "     - Manual start: ~/bin/lm-studio-start.sh"
 echo "     - Optimize (Vulkan + 64k context):"
 echo "       lms load qwen/qwen3.6-35b-a3b --gpu max -c 65536 --parallel 2"
 echo "     - See LM-Studio-Optimization.md for full tuning guide"
@@ -689,7 +704,7 @@ echo "     - ~/bin/pull-qwen3-coder-next.sh   (Qwen3-Coder-Next, ~48 GB)"
 echo ""
 echo "  3. Cloudflare Tunnel:"
 echo "     - ~/bin/cloudflared-login.sh       (first time only)"
-echo "     - ~/bin/cloudflared-llm.sh llm 13305"
+echo "     - ~/bin/cloudflared-llm.sh llm 1234"
 echo ""
 echo "  4. Remote Desktop:"
 echo "     - ~/bin/install-remote-desktop.sh"
@@ -701,9 +716,12 @@ echo ""
 echo "  6. Sync config across machines:"
 echo "     - export PI_CODING_AGENT_DIR=/path/to/synced/dotfiles/pi-agent"
 echo ""
-echo "  7. Enable user linger (so services survive logout):"
-echo "     - sudo loginctl enable-linger $USER"
+echo "  7. LM Studio at reboot: install-lm-studio-service.sh (already run by setup)."
+echo "     - Re-run: $REPO_DIR/bin/install-lm-studio-service.sh"
+echo "     - Check:  systemctl --user status lm-studio.service"
+echo "  8. Server stays awake: configure-server-power.sh (already run by setup)."
+echo "     - Re-run: $REPO_DIR/bin/configure-server-power.sh"
 echo ""
-echo "  8. Commit everything to git:"
+echo "  9. Commit everything to git:"
 echo "     - cd ~/dev/amd-halo && git add -A && git commit -m 'initial setup'"
 echo ""

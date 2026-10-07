@@ -8,8 +8,8 @@
 set -euo pipefail
 
 HOSTNAME_BASE="m634.dev"
-LEMONADE_ORIGIN="http://127.0.0.1:13305"
-# Lemonade rejects the public Origin. The proxy strips it, then forwards.
+LM_STUDIO_ORIGIN="http://127.0.0.1:1234"
+# Some browser clients send a public Origin; the proxy strips it, then forwards.
 PROXY_ORIGIN="http://127.0.0.1:13315"
 PROXY_UNIT="llm-origin-proxy.service"
 CF_DIR="${HOME}/.cloudflared"
@@ -114,7 +114,7 @@ if [[ ! -f "${CF_DIR}/cert.pem" ]]; then
 fi
 
 if [[ "${ORIGIN}" == "${PROXY_ORIGIN}" ]]; then
-  CHECK_URL="${LEMONADE_ORIGIN}/"
+  CHECK_URL="${LM_STUDIO_ORIGIN}/"
 else
   CHECK_URL="${ORIGIN}"
 fi
@@ -172,12 +172,12 @@ install_origin_proxy() {
   mkdir -p "${HOME}/.config/systemd/user"
   cat > "${unit_path}" <<EOF
 [Unit]
-Description=Strip browser Origin before forwarding to Lemonade
+Description=Strip browser Origin before forwarding to LM Studio
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 ${HOME}/llm-origin-proxy.py
+ExecStart=/usr/bin/python3 ${HOME}/bin/llm-origin-proxy.py
 Restart=always
 RestartSec=2
 
@@ -191,11 +191,11 @@ EOF
 
 if [[ "${ORIGIN}" == "${PROXY_ORIGIN}" ]]; then
   install_origin_proxy
-  UNIT_AFTER="network-online.target ${PROXY_UNIT}"
-  UNIT_WANTS="network-online.target ${PROXY_UNIT}"
+  UNIT_AFTER="network-online.target lm-studio.service ${PROXY_UNIT}"
+  UNIT_WANTS="network-online.target lm-studio.service ${PROXY_UNIT}"
 else
-  UNIT_AFTER="network-online.target"
-  UNIT_WANTS="network-online.target"
+  UNIT_AFTER="network-online.target lm-studio.service"
+  UNIT_WANTS="network-online.target lm-studio.service"
 fi
 
 echo "Routing ${HOSTNAME} to tunnel ${TUNNEL_NAME}"
@@ -235,7 +235,7 @@ systemctl --user --no-pager --full status "${UNIT_NAME}"
 
 echo
 if [[ "${ORIGIN}" == "${PROXY_ORIGIN}" ]]; then
-  echo "https://${HOSTNAME} proxies to ${PROXY_ORIGIN}, which forwards to ${LEMONADE_ORIGIN}"
+  echo "https://${HOSTNAME} proxies to ${PROXY_ORIGIN}, which forwards to ${LM_STUDIO_ORIGIN}"
 else
   echo "https://${HOSTNAME} proxies to ${ORIGIN}"
 fi

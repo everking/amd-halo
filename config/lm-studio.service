@@ -1,0 +1,16 @@
+# Installed by ~/dev/amd-halo/bin/install-lm-studio-service.sh (see README.md).
+[Unit]
+Description=LM Studio headless (llmster, API, default model)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=1200
+Environment=PATH=%h/.lmstudio/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/bin/lm-studio-boot.sh start
+ExecStop=%h/bin/lm-studio-boot.sh stop
+
+[Install]
+WantedBy=default.target

@@ -11,7 +11,7 @@ Documentation of inference tuning applied on **2026-10-03** for headless LM Stud
 | RAM | ~125 GiB |
 | LM Studio | **2.41.0** llama.cpp backends (CPU AVX2, Vulkan AVX2, CUDA AVX2 installed; **CUDA unused**, no NVIDIA GPU) |
 | Deployment | **Headless only** — no LM Studio desktop/Electron app in use |
-| API | `lms server` on **0.0.0.0:1234** (see port note below) |
+| API | `lms server` on **0.0.0.0:1234** |
 | Primary model tuned | `qwen/qwen3.6-35b-a3b` (GGUF Q4_K_M + vision `mmproj`) |
 
 ### How processes fit together
@@ -22,9 +22,9 @@ lms (CLI)  →  llmster  (~/.lmstudio/llmster/…/llmster)
             llama-server  (per loaded model; bundled under ~/.lmstudio/extensions/backends/…)
 ```
 
-- **`cloudflared-llm.service`** tunnels to the API; it does **not** start `llmster`.
-- **`~/bin/lm-studio-start.sh`** runs `lms server start --bind 0.0.0.0 --port 13305` — different port than the active **1234** setup. Align clients (e.g. Pi `lm-toggle.sh` uses `http://127.0.0.1:1234`) with whichever port you standardize on.
-
+- **`lm-studio.service`** (amd-halo) starts `llmster`, the API, and the default model at boot (requires `loginctl enable-linger`; installed by `setup.sh` / `bin/install-lm-studio-service.sh`).
+- **`configure-server-power.sh`** (amd-halo) disables idle suspend so the host stays reachable for remote tunnel/API use (`setup.sh` section 11c; see README **Rebuild from scratch**).
+- **`cloudflared-llm.service`** tunnels to the API; it **depends on** `lm-studio.service` when installed via `~/bin/cloudflared-llm.sh`.
 ## Baseline (before optimization)
 
 Observed on **2026-10-03** prior to changes:
@@ -112,6 +112,28 @@ curl -sS -X POST http://127.0.0.1:1234/api/v1/models/load \
 ~/.lmstudio/bin/lms load qwen/qwen3.6-35b-a3b --gpu max -c 65536 --parallel 2
 ```
 
+### 5. Boot without login (systemd)
+
+**Why:** API and model should return after reboot with no one logged in (headless server).
+
+**Installed by:** `~/dev/amd-halo/setup.sh` or `~/dev/amd-halo/bin/install-lm-studio-service.sh`.
+
+| Piece | Location |
+|-------|----------|
+| Boot logic | `~/bin/lm-studio-boot.sh` (repo: `bin/lm-studio-boot.sh`) |
+| Manual start | `~/bin/lm-studio-start.sh` |
+| systemd unit | `~/.config/systemd/user/lm-studio.service` (repo: `config/lm-studio.service`) |
+| User linger | `sudo loginctl enable-linger $USER` |
+
+```bash
+~/dev/amd-halo/bin/install-lm-studio-service.sh
+systemctl --user enable --now lm-studio.service
+loginctl show-user $USER | grep Linger
+journalctl --user -u lm-studio.service -b
+```
+
+`ExecStart` runs the same steps as section 4: `lms daemon up`, `lms server start --bind 0.0.0.0 --port 1234`, then `lms load` if needed. Override model/load via `LMS_MODEL` and `LMS_LOAD_ARGS` in the unit environment.
+
 ## Target runtime parameters (after)
 
 These are the effective `llama-server` flags LM Studio passed for the optimized Qwen load:
@@ -181,6 +203,9 @@ Documented in [`ToDo.md`](ToDo.md):
 |------|--------|
 | `~/.lmstudio/.internal/backend-preferences-v1.json` | Vulkan backend for GGUF |
 | `~/.lmstudio/settings.json` | `defaultContextLength` 65536 |
+| `~/dev/amd-halo/config/lm-studio.service` | systemd user unit for boot |
+| `~/dev/amd-halo/bin/lm-studio-boot.sh` | Headless start script |
+| `~/dev/amd-halo/bin/install-lm-studio-service.sh` | Installs unit + linger + scripts |
 | `~/ToDo.md` | Follow-up checklist (headless-oriented) |
 | `~/LM-Studio-Optimization.md` | This document |
 
@@ -191,4 +216,4 @@ No model weights or GGUF files were modified.
 - Backends: `~/.lmstudio/extensions/backends/llama.cpp-linux-x86_64-*-2.41.0/`
 - Logs: `~/.lmstudio/server-logs/`
 - CLI: `~/.lmstudio/bin/lms`
-- Helper scripts: `~/bin/lm-studio-start.sh`, `~/.local/bin/lm-toggle.sh`
+- Helper scripts: `~/bin/lm-studio-boot.sh`, `~/bin/lm-studio-start.sh`, `~/dev/amd-halo/bin/install-lm-studio-service.sh`, `~/.local/bin/lm-toggle.sh`

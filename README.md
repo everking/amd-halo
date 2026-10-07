@@ -23,6 +23,8 @@ amd-halo/
 ├── LM-Studio-Optimization.md
 ├── llm-origin-proxy.py
 ├── config/
+│   ├── logind/99-server-no-suspend.conf  # no idle suspend (server role)
+│   ├── lm-studio.service  # systemd user unit (boot without login)
 │   ├── pi/
 │   │   ├── settings.json  # Pi agent config
 │   │   └── models.json    # LM Studio provider + models
@@ -31,7 +33,9 @@ amd-halo/
 │       ├── mcp.json       # MCP server config
 │       └── backend-preferences-v1.json  # Vulkan GGUF engine
 └── bin/
-    ├── lm-studio-start.sh
+    ├── install-lm-studio-service.sh  # lm-studio.service + linger
+    ├── lm-studio-boot.sh             # daemon + API + model (systemd ExecStart)
+    ├── lm-studio-start.sh            # manual start (calls boot script)
     ├── cloudflared-login.sh
     ├── cloudflared-llm.sh
     ├── pull-qwen3-coder-next.sh
@@ -70,6 +74,53 @@ pgrep -af llama-server | grep vulkan-avx2
 ~/.lmstudio/bin/lms load qwen/qwen3.6-35b-a3b --gpu max -c 65536 --parallel 2
 ```
 
+### Boot without login (systemd)
+
+`setup.sh` runs **`bin/install-lm-studio-service.sh`**, which:
+
+1. Installs `~/bin/lm-studio-boot.sh` and `~/bin/lm-studio-start.sh`
+2. Installs `~/.config/systemd/user/lm-studio.service` from `config/lm-studio.service`
+3. Enables **`loginctl enable-linger`** so user systemd runs at boot (no graphical login)
+4. Enables **`lm-studio.service`** on `default.target`
+
+At boot the service runs `lm-studio-boot.sh start`: `lms daemon up`, API on **0.0.0.0:1234**, then loads **`qwen/qwen3.6-35b-a3b`** with the optimized flags unless already loaded. First boot can take several minutes while weights load.
+
+```bash
+# Re-run install only (after pulling repo changes):
+~/dev/amd-halo/bin/install-lm-studio-service.sh
+
+systemctl --user enable --now lm-studio.service
+systemctl --user status lm-studio.service
+journalctl --user -u lm-studio.service -b
+```
+
+Optional overrides (edit the unit or use `systemctl --user edit lm-studio.service`):
+
+| Variable | Default |
+|----------|---------|
+| `LMS_PORT` | `1234` |
+| `LMS_BIND` | `0.0.0.0` |
+| `LMS_MODEL` | `qwen/qwen3.6-35b-a3b` |
+| `LMS_LOAD_ARGS` | `--gpu max -c 65536 --parallel 2` |
+
+Cloudflare tunnel units installed via **`cloudflared-llm.sh`** order **after** `lm-studio.service` so the API is up before the tunnel connects.
+
+### Remote server: stay awake (no idle suspend)
+
+For SSH/cloudflared access after **hours or days** without local keyboard/mouse, idle suspend must be off — otherwise LM Studio and the tunnel go down and **nothing on port 1234 wakes the machine**.
+
+`setup.sh` runs **`bin/configure-server-power.sh`**, which:
+
+- Masks systemd `sleep.target` / `suspend.target` / hibernate targets
+- Installs `config/logind/99-server-no-suspend.conf` under `/etc/systemd/logind.conf.d/`
+- Sets GNOME **sleep-inactive-\*-type** to **`nothing`** (when run with a user D-Bus session)
+
+```bash
+~/dev/amd-halo/bin/configure-server-power.sh
+```
+
+Inbound traffic (tunnel, curl to :1234) does **not** wake a suspended host; keeping suspend disabled is the reliable approach for this role.
+
 ## Quick start
 
 ```bash
@@ -85,6 +136,26 @@ chmod +x setup.sh
 ```
 
 The script is **idempotent** — re-running it is safe.
+
+### Rebuild from scratch (remote LLM server)
+
+After a fresh OS install, one `./setup.sh` run (with sudo when prompted) covers most of the **always-on server** stack:
+
+| Automated by `setup.sh` | Script / artifact |
+|-------------------------|-------------------|
+| LM Studio AppImage + Vulkan/config under `~/.lmstudio` | LM Studio section |
+| Boot without login: `lm-studio.service` + **linger** | `bin/install-lm-studio-service.sh` |
+| **No idle suspend** (LM Studio + tunnel stay up) | `bin/configure-server-power.sh`, `config/logind/99-server-no-suspend.conf` |
+| `cloudflared` package + `~/bin/cloudflared-llm.sh` | cloudflared section |
+
+**You still do manually once per machine** (secrets / Cloudflare / large downloads):
+
+1. `~/bin/cloudflared-login.sh` — tunnel credentials
+2. `~/bin/cloudflared-llm.sh llm 1234` — writes and **enables** `cloudflared-llm.service` (depends on `lm-studio.service`)
+3. Load or download models (e.g. `lms load …`, `~/bin/pull-qwen3-coder-next.sh`)
+4. Optional: `~/bin/install-remote-desktop.sh`
+
+Skip flags: `SKIP_SERVER_POWER=1`, `SKIP_LM_STUDIO=1`, `SKIP_CLOUDFLARED=1`, etc. (see header of `setup.sh`).
 
 ## Manual setup
 
@@ -140,13 +211,17 @@ sudo ln -sf /opt/lm-studio/lm-studio.AppImage /usr/local/bin/lm-studio
 #### Start the inference server
 
 ```bash
-# Option A: Use the bundled lms CLI
-lms server start --bind 0.0.0.0 --port 13305
+# Option A (recommended on this machine): systemd — survives reboot, no login
+~/dev/amd-halo/bin/install-lm-studio-service.sh   # once
+systemctl --user start lm-studio.service
 
-# Option B: Use the helper script
+# Option B: Use the bundled lms CLI
+lms server start --bind 0.0.0.0 --port 1234
+
+# Option C: Use the helper script (same as boot script start)
 ~/bin/lm-studio-start.sh
 
-# Option C: Open the GUI, load a model, and the server starts automatically
+# Option D: Open the GUI, load a model, and the server starts automatically
 lm-studio
 ```
 
@@ -241,7 +316,7 @@ cloudflared tunnel login
 
 ```bash
 # Use the helper script
-~/bin/cloudflared-llm.sh llm 13305
+~/bin/cloudflared-llm.sh llm 1234
 
 # Or manually:
 cloudflared tunnel create llm
@@ -304,10 +379,20 @@ chsh -s $(which zsh)
 # Then log out and back in
 ```
 
-### 10. Enable user linger (services survive logout)
+### 10. LM Studio at boot (no login required)
+
+This is installed automatically by **`./setup.sh`** (see **Boot without login** under [LM Studio Optimization](#lm-studio-optimization) above). To configure manually:
 
 ```bash
-sudo loginctl enable-linger $USER
+~/dev/amd-halo/bin/install-lm-studio-service.sh
+systemctl --user enable --now lm-studio.service
+loginctl show-user $USER | grep Linger    # expect Linger=yes
+```
+
+Re-install the Cloudflare tunnel unit after LM Studio service exists so ordering is correct:
+
+```bash
+~/bin/cloudflared-llm.sh llm 1234
 ```
 
 ## Custom scripts
@@ -316,7 +401,10 @@ All custom scripts live in `~/bin/`:
 
 | Script | Purpose |
 |--------|---------|
-| `lm-studio-start.sh` | Start the LM Studio inference server |
+| `configure-server-power.sh` | Disable idle suspend (remote server / always-on LLM) |
+| `install-lm-studio-service.sh` | Install `lm-studio.service`, boot scripts, and user linger |
+| `lm-studio-boot.sh` | Full headless stack (daemon, API, model); used by systemd |
+| `lm-studio-start.sh` | Manual start (calls `lm-studio-boot.sh` when installed) |
 | `pull-qwen3-coder-next.sh` | Download Qwen3-Coder-Next model (~48 GB) |
 | `cloudflared-login.sh` | Authenticate cloudflared with Cloudflare |
 | `cloudflared-llm.sh` | Create/reuse a Cloudflare Tunnel for LLM services |
@@ -347,21 +435,45 @@ Then sync that directory with your preferred tool (git, syncthing, iCloud, etc.)
 ### LM Studio server won't start
 
 ```bash
-# Check if port 13305 is in use
-ss -tlnp | grep 13305
+# Boot service (preferred)
+systemctl --user status lm-studio.service
+journalctl --user -u lm-studio.service -b --no-pager | tail -50
+
+# Check if port 1234 is in use
+ss -tlnp | grep 1234
 
 # Kill any existing process
-fuser -k 13305/tcp
+fuser -k 1234/tcp
 
 # Restart
+systemctl --user restart lm-studio.service
+# or
 ~/bin/lm-studio-start.sh
+```
+
+### LM Studio not up after reboot
+
+```bash
+loginctl show-user $USER | grep Linger          # must be yes for boot without login
+systemctl --user is-enabled lm-studio.service
+systemctl --user start lm-studio.service
+```
+
+### Machine slept / services unreachable remotely
+
+Suspend stops the whole system; the tunnel and API return only after something wakes the hardware (power button, etc.).
+
+```bash
+~/dev/amd-halo/bin/configure-server-power.sh
+gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type   # expect 'nothing'
+systemctl is-enabled sleep.target   # expect masked
 ```
 
 ### Pi can't connect to LM Studio
 
 ```bash
 # Verify the server is running
-curl http://127.0.0.1:13305/v1/models
+curl http://127.0.0.1:1234/v1/models
 
 # Check models.json baseUrl matches
 cat ~/.pi/agent/models.json | grep baseUrl
