@@ -16,7 +16,7 @@
 #   SKIP_PI=1            — skip pi agent install
 #   SKIP_PYTHON=1        — skip pip packages
 #   SKIP_CLOUDFLARED=1   — skip cloudflared install
-#   SKIP_RDP=1           — skip remote desktop install
+
 #   SKIP_MODELS=1        — skip model downloads
 #   SKIP_GIT_CONFIG=1    — skip git config
 #   SKIP_SERVER_POWER=1  — skip disable idle suspend (remote server role)
@@ -475,24 +475,7 @@ else
   warn "Skipping cloudflared install."
 fi
 
-# ── 7. Remote Desktop ──────────────────────────────────────────────────────
-
-if [[ "${SKIP_RDP:-0}" != "1" ]]; then
-  log "=== Remote Desktop ==="
-
-  REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-  if [[ ! -f "$HOME/bin/install-remote-desktop.sh" ]]; then
-    if [[ -f "$REPO_DIR/bin/install-remote-desktop.sh" ]]; then
-      cp "$REPO_DIR/bin/install-remote-desktop.sh" "$HOME/bin/install-remote-desktop.sh"
-      chmod +x "$HOME/bin/install-remote-desktop.sh"
-      log "Installed ~/bin/install-remote-desktop.sh"
-    fi
-  fi
-else
-  warn "Skipping RDP install."
-fi
-
-# ── 8. Install bin scripts from repo ───────────────────────────────────────
+# ── 7. Install bin scripts from repo ───────────────────────────────────────
 
 log "=== Installing bin scripts ==="
 
@@ -706,22 +689,19 @@ echo "  3. Cloudflare Tunnel:"
 echo "     - ~/bin/cloudflared-login.sh       (first time only)"
 echo "     - ~/bin/cloudflared-llm.sh llm 1234"
 echo ""
-echo "  4. Remote Desktop:"
-echo "     - ~/bin/install-remote-desktop.sh"
-echo ""
-echo "  5. Pi coding agent:"
+echo "  4. Pi coding agent:"
 echo "     - pi                                (start interactive)"
 echo "     - /reload                           (reload config)"
 echo ""
-echo "  6. Sync config across machines:"
+echo "  5. Sync config across machines:"
 echo "     - export PI_CODING_AGENT_DIR=/path/to/synced/dotfiles/pi-agent"
 echo ""
-echo "  7. LM Studio at reboot: install-lm-studio-service.sh (already run by setup)."
+echo "  6. LM Studio at reboot: install-lm-studio-service.sh (already run by setup)."
 echo "     - Re-run: $REPO_DIR/bin/install-lm-studio-service.sh"
 echo "     - Check:  systemctl --user status lm-studio.service"
-echo "  8. Server stays awake: configure-server-power.sh (already run by setup)."
+echo "  7. Server stays awake: configure-server-power.sh (already run by setup)."
 echo "     - Re-run: $REPO_DIR/bin/configure-server-power.sh"
 echo ""
-echo "  9. Commit everything to git:"
+echo "  8. Commit everything to git:"
 echo "     - cd ~/dev/amd-halo && git add -A && git commit -m 'initial setup'"
 echo ""

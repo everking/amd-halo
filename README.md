@@ -25,6 +25,7 @@ amd-halo/
 ├── config/
 │   ├── logind/99-server-no-suspend.conf  # no idle suspend (server role)
 │   ├── lm-studio.service  # systemd user unit (boot without login)
+│   ├── polkit/            # polkit rules
 │   ├── pi/
 │   │   ├── settings.json  # Pi agent config
 │   │   └── models.json    # LM Studio provider + models
@@ -39,7 +40,6 @@ amd-halo/
     ├── cloudflared-login.sh
     ├── cloudflared-llm.sh
     ├── pull-qwen3-coder-next.sh
-    └── install-remote-desktop.sh
 ```
 
 **Static config files live in `config/`** — they are copied to their target locations during setup.
@@ -153,7 +153,6 @@ After a fresh OS install, one `./setup.sh` run (with sudo when prompted) covers 
 1. `~/bin/cloudflared-login.sh` — tunnel credentials
 2. `~/bin/cloudflared-llm.sh llm 1234` — writes and **enables** `cloudflared-llm.service` (depends on `lm-studio.service`)
 3. Load or download models (e.g. `lms load …`, `~/bin/pull-qwen3-coder-next.sh`)
-4. Optional: `~/bin/install-remote-desktop.sh`
 
 Skip flags: `SKIP_SERVER_POWER=1`, `SKIP_LM_STUDIO=1`, `SKIP_CLOUDFLARED=1`, etc. (see header of `setup.sh`).
 
@@ -328,12 +327,15 @@ cloudflared tunnel route dns llm llm.m634.dev
 
 ### 8. Remote Desktop (GNOME RDP)
 
+**Default:** **GNOME Remote Desktop** (system RDP on **3389**) → **GDM login** with your **Linux username and password**.
+
 ```bash
-sudo apt-get install -y gnome-remote-desktop
-~/bin/install-remote-desktop.sh
+~/bin/install-gnome-rdp.sh
 ```
 
-This sets up headless RDP on port 3389 with auto-generated credentials.
+- Accept the **self-signed certificate** warning in the RDP client.
+- **First RDP prompt (gate):** set via `install-gnome-rdp.sh` — use the **same user/password as Linux** (GNOME requires gate creds; empty gate → Windows error **0x4**).
+- **Second prompt:** GDM login (Linux user + password again).
 
 ### 9. Shell profile
 
@@ -409,7 +411,6 @@ All custom scripts live in `~/bin/`:
 | `cloudflared-login.sh` | Authenticate cloudflared with Cloudflare |
 | `cloudflared-llm.sh` | Create/reuse a Cloudflare Tunnel for LLM services |
 | `llm-origin-proxy.py` | HTTP proxy that strips Origin headers and adds web search support |
-| `install-remote-desktop.sh` | Install and configure headless GNOME RDP |
 
 ## Syncing config across machines
 
@@ -492,15 +493,14 @@ journalctl --user -u cloudflared-llm-llm.service -f
 cloudflared tunnel info llm
 ```
 
+
 ### RDP won't connect
 
 ```bash
-# Check if port 3389 is open
 ss -tlnp | grep 3389
-
-# Check service status
-systemctl --user status gnome-remote-desktop-headless.service
-
-# Get password from file
-cat ~/.local/share/gnome-remote-desktop/rdp-password
+systemctl status gnome-remote-desktop
 ```
+
+Use your **Linux** username and password. Re-run `~/bin/install-gnome-rdp.sh` after pulling repo changes.
+
+**Black screen:** GNOME cannot run a second full Shell for the same user while you are logged in locally. Disconnect RDP fully, reconnect.
