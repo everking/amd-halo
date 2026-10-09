@@ -20,9 +20,11 @@ Reproducible setup for the AMD Ryzen AI Developer Platform (rex).
 amd-halo/
 ├── setup.sh              # Idempotent setup script
 ├── README.md
+├── RemoteDesktop.md      # CRD GNOME session and system RDP
 ├── LM-Studio-Optimization.md
 ├── llm-origin-proxy.py
 ├── config/
+│   ├── chrome-remote-desktop-session  # CRD: GNOME on Xorg
 │   ├── logind/99-server-no-suspend.conf  # no idle suspend (server role)
 │   ├── lm-studio.service  # systemd user unit (boot without login)
 │   ├── polkit/            # polkit rules
@@ -44,6 +46,18 @@ amd-halo/
 
 **Static config files live in `config/`** — they are copied to their target locations during setup.
 **Scripts live in `bin/`** — they are copied to `~/bin/` during setup.
+
+## Remote desktop
+
+See **[RemoteDesktop.md](RemoteDesktop.md)**.
+
+Chrome Remote Desktop starts at boot as `chrome-remote-desktop@eric.service` and runs GNOME on Xorg from `~/.chrome-remote-desktop-session`. It does not attach to the GDM Wayland seat, and it does not use `~/.xsession` (that file starts XFCE). Do not set `CHROME_REMOTE_DESKTOP_USE_WAYLAND`.
+
+Port **3389** is GNOME Remote Desktop (GDM login), installed by `bin/install-gnome-rdp.sh`.
+
+```bash
+~/dev/amd-halo/bin/install-chrome-remote-desktop.sh
+```
 
 ## LM Studio Optimization
 
@@ -325,9 +339,11 @@ cloudflared tunnel route dns llm llm.m634.dev
 # (Start the systemd user service)
 ```
 
-### 8. Remote Desktop (GNOME RDP)
+### 8. Remote Desktop
 
-**Default:** **GNOME Remote Desktop** (system RDP on **3389**) → **GDM login** with your **Linux username and password**.
+**Chrome Remote Desktop** is the Google-account session (GNOME on Xorg). **GNOME Remote Desktop** is system RDP on **3389** → **GDM login** with your **Linux username and password**. Details and the boot order are in [RemoteDesktop.md](RemoteDesktop.md).
+
+**GNOME Remote Desktop:**
 
 ```bash
 ~/bin/install-gnome-rdp.sh
@@ -342,7 +358,8 @@ cloudflared tunnel route dns llm llm.m634.dev
 The setup installs **zsh** (with oh-my-zsh) and creates a combined profile:
 
 - **`~/.profile`** — sourced by login shells (bash, zsh). Contains all PATH and variable exports.
-- **`~/.zshrc`** — sources `~/.profile` so zsh gets the same variables.
+- **`~/.zshrc`** — sources `~/.profile` so interactive zsh gets the same variables.
+- **`~/.zprofile`** — read by a zsh login shell. Chrome Remote Desktop's `--new-session` is a non-interactive login zsh, so it reads this file and not `~/.zshrc`. Leave `CHROME_REMOTE_DESKTOP_USE_WAYLAND` unset here. See [RemoteDesktop.md](RemoteDesktop.md).
 
 #### What gets added to `~/.profile`
 
@@ -411,6 +428,8 @@ All custom scripts live in `~/bin/`:
 | `cloudflared-login.sh` | Authenticate cloudflared with Cloudflare |
 | `cloudflared-llm.sh` | Create/reuse a Cloudflare Tunnel for LLM services |
 | `llm-origin-proxy.py` | HTTP proxy that strips Origin headers and adds web search support |
+| `install-chrome-remote-desktop.sh` | Install Chrome Remote Desktop and the GNOME-on-Xorg session |
+| `install-gnome-rdp.sh` | System RDP on port 3389 (GDM login) |
 
 ## Syncing config across machines
 

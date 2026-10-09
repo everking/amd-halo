@@ -1,0 +1,9 @@
+#!/bin/sh
+# Chrome Remote Desktop session: GNOME on Xorg, same desktop as a console login.
+# ~/.xsession stays the xrdp XFCE session and is not used here.
+unset XDG_MENU_PREFIX
+export XDG_SESSION_TYPE=x11
+export XDG_CURRENT_DESKTOP=GNOME
+export XDG_SESSION_DESKTOP=gnome
+export DESKTOP_SESSION=gnome-xorg
+exec /etc/X11/Xsession /usr/bin/gnome-session
